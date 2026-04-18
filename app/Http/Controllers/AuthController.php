@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 // use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use App\Mail\OtpMail;
 
 class AuthController extends Controller
 {
@@ -31,10 +32,7 @@ class AuthController extends Controller
             'otp_expires_at' => now()->addMinutes(5),
         ]);
 
-        Mail::raw("Kode OTP kamu: $otp", function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Kode OTP');
-        });
+        Mail::to($user->email)->send(new OtpMail($otp));
 
         return response()->json([
             'message' => 'Register berhasil, cek email untuk OTP'
