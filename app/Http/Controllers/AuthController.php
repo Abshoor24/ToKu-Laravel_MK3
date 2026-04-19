@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 // use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use App\Mail\OtpMail;
 
 class AuthController extends Controller
 {
@@ -25,16 +25,14 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => $request->password,
             'phone' => $request->phone,
+            'role' => 'user',
             'otp' => $otp,
             'otp_expires_at' => now()->addMinutes(5),
         ]);
 
-        Mail::raw("Kode OTP kamu: $otp", function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Kode OTP');
-        });
+        Mail::to($user->email)->send(new OtpMail($otp));
 
         return response()->json([
             'message' => 'Register berhasil, cek email untuk OTP'
@@ -94,9 +92,21 @@ public function login(Request $request)
         return response()->json(['message' => 'Verifikasi email dulu'], 403);
     }
 
+    $token = $user->createToken('token')->plainTextToken;
+
     return response()->json([
         'message' => 'Login berhasil',
+        'token' => $token,
         'user' => $user
+    ]);
+}
+
+public function logout(Request $request)
+{
+    $request->user()->currentAccessToken()->delete();
+
+    return response()->json([
+        'message' => 'Logout berhasil'
     ]);
 }
 }
