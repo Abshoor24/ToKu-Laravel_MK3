@@ -8,9 +8,11 @@
         "php": "^8.2",
         "filament/filament": "^5.5",
         "laravel/framework": "^11.0",
+        "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.9"
     },
     "require-dev": {
+        "barryvdh/laravel-ide-helper": "^3.7",
         "fakerphp/faker": "^1.23",
         "laravel/pint": "^1.13",
         "laravel/sail": "^1.26",
