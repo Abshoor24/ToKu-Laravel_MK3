@@ -44,6 +44,6 @@ class TransactionForm
                     ->columns(3)
                     ->required()
                     ->label('Daftar Produk'),
-            ]);
+            ])->disabled();
     }
 }
