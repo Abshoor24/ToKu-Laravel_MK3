@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\Transactions;
 
-use App\Filament\Resources\Transactions\Pages\CreateTransaction;
-use App\Filament\Resources\Transactions\Pages\EditTransaction;
 use App\Filament\Resources\Transactions\Pages\ListTransactions;
 use App\Filament\Resources\Transactions\Pages\ViewTransaction;
 use App\Filament\Resources\Transactions\Schemas\TransactionForm;
@@ -26,6 +24,7 @@ class TransactionResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        // Form tetap ada, tapi tidak akan dipakai karena create/edit dimatikan
         return TransactionForm::configure($schema);
     }
 
@@ -46,13 +45,42 @@ class TransactionResource extends Resource
         ];
     }
 
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return true;
+    }
+
+    public static function canView($record): bool
+    {
+        return true;
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListTransactions::route('/'),
-            'create' => CreateTransaction::route('/create'),
             'view' => ViewTransaction::route('/{record}'),
-            'edit' => EditTransaction::route('/{record}/edit'),
         ];
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return true;
     }
 }
