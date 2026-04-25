@@ -44,7 +44,7 @@ class TransactionController extends Controller
     {
         #validasi field
         $request->validate([
-            'customer_name' => 'required|string',
+            'name' => 'required|string',
             'phone' => 'required|string',
             'items' => 'required|array',
             'items.*.product_id' => 'required|exists:products,id',
@@ -56,21 +56,23 @@ class TransactionController extends Controller
         try {
             $total = 0;
 
+            $products = [];
+
             foreach ($request->items as $item) {
                 $product = Product::findOrFail($item['product_id']);
 
-                #validasi stok
                 if ($product->stock < $item['quantity']) {
                     throw new \Exception("Stock not enough for {$product->name}");
                 }
 
-                #hitung total
-                $total = $product->price * $item['quantity'];
-            }
+                $products[] = $product;
 
+                $total += $product->price * $item['quantity'];
+            }
             #buat transaksi
             $transaction = Transaction::create([
-                'customer_name' => $request->customer_name,
+                'user_id' => auth()->id(),
+                'name' => $request->name,
                 'phone' => $request->phone,
                 'total_price' => $total,
             ]);
