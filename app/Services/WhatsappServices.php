@@ -8,7 +8,7 @@ class WhatsappService {
     public function send($phone, $message) {
         $token = env('TOKEN_FONTE');
 
-        Http::withHeader([
+        Http::withHeaders([
             'Authorization' => $token,
         ])->post('https://api.fonnte.com/send', [
             'target' => $phone,
