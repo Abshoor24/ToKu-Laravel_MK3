@@ -7,9 +7,16 @@ use App\Models\Transaction;
 use App\Models\TransactionItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\WhatsAppService;
 
 class TransactionController extends Controller
-{
+{   
+    protected $waService;
+
+    public function __construct(WhatsAppService $waService)
+    {
+        $this->waService = $waService;
+    }
     # GET
     public function index()
     {
@@ -92,6 +99,14 @@ class TransactionController extends Controller
             }
             DB::commit();
 
+            $transaction->load('items.product');
+
+            // generate receipt
+            $message = $this->generateReceipt($transaction);
+
+            // kirim WA
+            $this->waService->send($transaction->phone, $message);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Transaksi berhasil',
@@ -125,5 +140,24 @@ class TransactionController extends Controller
             'seccess' => true,
             'message' => 'Transaction deleted'
         ]);
+    }
+
+    public function generateReceipt($transaction)
+    {
+        $message = "🧾 *STRUK PEMBELIAN*\n\n";
+        $message .= "Nama: {$transaction->name}\n";
+        $message .= "No HP: {$transaction->phone}\n";
+        $message .= "Tanggal: {$transaction->created_at}\n\n";
+
+        $message .= "📦 *Detail Produk:*\n";
+
+        foreach ($transaction->items as $item) {
+            $message .= "- {$item->product->name} x{$item->quantity} = Rp" . number_format($item->price * $item->quantity) . "\n";
+        }
+
+        $message .= "\n💰 *Total: Rp" . number_format($transaction->total_price) . "*\n";
+        $message .= "\nTerima kasih 🙏";
+
+        return $message;
     }
 }
