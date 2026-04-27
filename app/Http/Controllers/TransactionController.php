@@ -5,54 +5,56 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
+use App\Services\WhatsAppServices;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\WhatsAppService;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Resources\TransactionResource;
 
 class TransactionController extends Controller
-{   
+{
     protected $waService;
 
-    public function __construct(WhatsAppService $waService)
+    public function __construct(WhatsAppServices $waService)
     {
         $this->waService = $waService;
     }
     # GET
     public function index()
     {
-        $transaction = Transaction::with('items.product')->latest()->get();
+        $transactions = Transaction::with('items.product', 'user')->latest()->get();
 
         return response()->json([
-            'seccess' => true,
-            'data' => $transaction
+            'success' => true,
+            'data' => TransactionResource::collection($transactions)
         ]);
     }
 
     # READ BY ID
     public function show($id)
     {
-        $transaction = Transaction::with('items.product')->find($id);
+        $transaction = Transaction::with('items.product', 'user')->find($id);
 
         if (!$transaction) {
             return response()->json([
-                'seccess' => false,
+                'success' => false,
                 'message' => 'Transaction not found'
             ], 404);
         }
 
         return response()->json([
-            'seccess' => true,
-            'data' => $transaction
+            'success' => true,
+            'data' => new TransactionResource($transaction)
         ]);
     }
 
     # CREATE
     public function store(Request $request)
     {
+
+        $user = Auth::user();
         #validasi field
         $request->validate([
-            'name' => 'required|string',
-            'phone' => 'required|string',
             'items' => 'required|array',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -78,9 +80,9 @@ class TransactionController extends Controller
             }
             #buat transaksi
             $transaction = Transaction::create([
-                'user_id' => auth()->id(),
-                'name' => $request->name,
-                'phone' => $request->phone,
+                'user_id' => Auth::id(),
+                'name' => $user->name,
+                'phone' => $user->phone,
                 'total_price' => $total,
             ]);
 
@@ -110,7 +112,7 @@ class TransactionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Transaksi berhasil',
-                'data' => $transaction->load('items.product')
+                'data' => new TransactionResource($transaction->load('items.product', 'user'))
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

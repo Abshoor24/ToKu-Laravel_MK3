@@ -4,7 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 
-class WhatsappService {
+class WhatsAppServices {
     public function send($phone, $message) {
         $token = env('TOKEN_FONTE');
 
