@@ -5,15 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
+use App\Services\WhatsAppServices;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\WhatsAppService;
+use Illuminate\Support\Facades\Auth;
 
 class TransactionController extends Controller
 {   
     protected $waService;
 
-    public function __construct(WhatsAppService $waService)
+    public function __construct(WhatsAppServices $waService)
     {
         $this->waService = $waService;
     }
@@ -48,11 +49,11 @@ class TransactionController extends Controller
 
     # CREATE
     public function store(Request $request)
-    {
+    {   
+
+        $user = Auth::user();
         #validasi field
         $request->validate([
-            'name' => 'required|string',
-            'phone' => 'required|string',
             'items' => 'required|array',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -78,9 +79,9 @@ class TransactionController extends Controller
             }
             #buat transaksi
             $transaction = Transaction::create([
-                'user_id' => auth()->id(),
-                'name' => $request->name,
-                'phone' => $request->phone,
+                'user_id' => Auth::id(),
+                'name' => $user->name,
+                'phone' => $user->phone,
                 'total_price' => $total,
             ]);
 
