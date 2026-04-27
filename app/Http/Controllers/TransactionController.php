@@ -9,9 +9,10 @@ use App\Services\WhatsAppServices;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Resources\TransactionResource;
 
 class TransactionController extends Controller
-{   
+{
     protected $waService;
 
     public function __construct(WhatsAppServices $waService)
@@ -21,35 +22,35 @@ class TransactionController extends Controller
     # GET
     public function index()
     {
-        $transaction = Transaction::with('items.product')->latest()->get();
+        $transactions = Transaction::with('items.product', 'user')->latest()->get();
 
         return response()->json([
-            'seccess' => true,
-            'data' => $transaction
+            'success' => true,
+            'data' => TransactionResource::collection($transactions)
         ]);
     }
 
     # READ BY ID
     public function show($id)
     {
-        $transaction = Transaction::with('items.product')->find($id);
+        $transaction = Transaction::with('items.product', 'user')->find($id);
 
         if (!$transaction) {
             return response()->json([
-                'seccess' => false,
+                'success' => false,
                 'message' => 'Transaction not found'
             ], 404);
         }
 
         return response()->json([
-            'seccess' => true,
-            'data' => $transaction
+            'success' => true,
+            'data' => new TransactionResource($transaction)
         ]);
     }
 
     # CREATE
     public function store(Request $request)
-    {   
+    {
 
         $user = Auth::user();
         #validasi field
@@ -111,7 +112,7 @@ class TransactionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Transaksi berhasil',
-                'data' => $transaction->load('items.product')
+                'data' => new TransactionResource($transaction->load('items.product', 'user'))
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
