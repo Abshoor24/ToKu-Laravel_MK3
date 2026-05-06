@@ -22,7 +22,10 @@ class TransactionController extends Controller
     # GET
     public function index()
     {
-        $transactions = Transaction::with('items.product', 'user')->latest()->get();
+        $transactions = Transaction::with('items.product', 'user')
+        ->where('user_id', Auth::id())
+        ->latest()
+        ->get();
 
         return response()->json([
             'success' => true,
@@ -33,8 +36,10 @@ class TransactionController extends Controller
     # READ BY ID
     public function show($id)
     {
-        $transaction = Transaction::with('items.product', 'user')->find($id);
-
+        $transaction = Transaction::with('items.product', 'user')
+        ->where('id', $id)
+        ->where('user_id', Auth::id()) 
+        ->first();
         if (!$transaction) {
             return response()->json([
                 'success' => false,
@@ -127,11 +132,12 @@ class TransactionController extends Controller
     #delete
     public function delete($id)
     {
-        $transaction = Transaction::find($id);
+        $transaction = Transaction::find($id)
+        ->where();
 
         if (!$transaction) {
             return response()->json([
-                'seccess' => false,
+                'success' => false,
                 'message' => 'Transaction not found'
             ], 404);
         }
@@ -139,7 +145,7 @@ class TransactionController extends Controller
         $transaction->delete();
 
         return response()->json([
-            'seccess' => true,
+            'success' => true,
             'message' => 'Transaction deleted'
         ]);
     }

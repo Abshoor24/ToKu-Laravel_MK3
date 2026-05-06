@@ -22,7 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transactions', [TransactionController::class, 'index']);
     Route::get('/transactions/{id}', [TransactionController::class, 'show']);
     Route::post('/transactions', [TransactionController::class, 'store']);
-    Route::delete('/transactions/{id}', [TransactionController::class, 'delete']);
+    // Route::delete('/transactions/{id}', [TransactionController::class, 'delete']);
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
