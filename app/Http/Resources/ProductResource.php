@@ -13,9 +13,11 @@ class ProductResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'price' => $this->price,
+            'category' => $this->category,
             'stock' => $this->stock,
             'description' => $this->description,
-            'image' => $this->image,
+            'image' => $this->image ? asset('storage/' . $this->image) : null, # mengubahnama file yang tersimpan di database menjadi URL lengkap yang bisa diakses browser/frontend.
+            'created_at' => $this->created_at
         ];
     }
 }
