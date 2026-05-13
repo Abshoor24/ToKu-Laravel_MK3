@@ -15,7 +15,7 @@ class TransactionResource extends JsonResource
             'name' => $this->name,
             'phone' => $this->phone,
             'total_price' => $this->total_price,
-            'created_at' => $this->created_at,
+            'created_at' => $this->created_at?->toIso8601String(),
             'items' => $this->whenLoaded('items', fn() => $this->items->map(function ($item) {
                 return [
                     'product' => [
