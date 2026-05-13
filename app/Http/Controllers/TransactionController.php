@@ -9,6 +9,7 @@ use App\Services\WhatsAppServices;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Http\Resources\TransactionResource;
 
 class TransactionController extends Controller
@@ -23,9 +24,9 @@ class TransactionController extends Controller
     public function index()
     {
         $transactions = Transaction::with('items.product', 'user')
-        ->where('user_id', Auth::id())
-        ->latest()
-        ->get();
+            ->where('user_id', Auth::id())
+            ->latest()
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -37,9 +38,10 @@ class TransactionController extends Controller
     public function show($id)
     {
         $transaction = Transaction::with('items.product', 'user')
-        ->where('id', $id)
-        ->where('user_id', Auth::id()) 
-        ->first();
+            ->where('id', $id)
+            ->where('user_id', Auth::id())
+            ->first();
+
         if (!$transaction) {
             return response()->json([
                 'success' => false,
@@ -56,44 +58,53 @@ class TransactionController extends Controller
     # CREATE
     public function store(Request $request)
     {
-
         $user = Auth::user();
-        #validasi field
+
         $request->validate([
-            'items' => 'required|array',
+            'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
-        # mulai transaksi
+
         DB::beginTransaction();
 
         try {
+            $productIds = collect($request->items)->pluck('product_id')->unique();
+
+            $products = Product::whereIn('id', $productIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $itemsByProduct = collect($request->items)
+                ->groupBy('product_id')
+                ->map(fn ($items) => $items->sum('quantity'));
+
             $total = 0;
 
-            $products = [];
+            foreach ($itemsByProduct as $productId => $quantity) {
+                $product = $products->get($productId);
 
-            foreach ($request->items as $item) {
-                $product = Product::findOrFail($item['product_id']);
+                if (!$product) {
+                    throw new \Exception("Product ID {$productId} tidak ditemukan.");
+                }
 
-                if ($product->stock < $item['quantity']) {
+                if ($product->stock < $quantity) {
                     throw new \Exception("Stock not enough for {$product->name}");
                 }
 
-                $products[] = $product;
-
-                $total += $product->price * $item['quantity'];
+                $total += $product->price * $quantity;
             }
-            #buat transaksi
+
             $transaction = Transaction::create([
-                'user_id' => Auth::id(),
+                'user_id' => $user->id,
                 'name' => $user->name,
                 'phone' => $user->phone,
                 'total_price' => $total,
             ]);
 
-            #buat transaksi item
             foreach ($request->items as $item) {
-                $product = Product::findOrFail($item['product_id']);
+                $product = $products->get($item['product_id']);
 
                 TransactionItem::create([
                     'transaction_id' => $transaction->id,
@@ -104,22 +115,25 @@ class TransactionController extends Controller
 
                 $product->decrement('stock', $item['quantity']);
             }
+
             DB::commit();
 
-            $transaction->load('items.product');
+            $transaction->load('items.product', 'user');
 
-            // generate receipt
             $message = $this->generateReceipt($transaction);
 
-            // kirim WA
-            $this->waService->send($transaction->phone, $message);
+            try {
+                $this->waService->send($transaction->phone, $message);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send WhatsApp receipt for transaction '.$transaction->id.': '.$e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Transaksi berhasil',
-                'data' => new TransactionResource($transaction->load('items.product', 'user'))
+                'data' => new TransactionResource($transaction)
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
 
             return response()->json([
@@ -132,8 +146,9 @@ class TransactionController extends Controller
     #delete
     public function delete($id)
     {
-        $transaction = Transaction::find($id)
-        ->where();
+        $transaction = Transaction::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->first();
 
         if (!$transaction) {
             return response()->json([
