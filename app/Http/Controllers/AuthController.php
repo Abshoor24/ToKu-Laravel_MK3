@@ -32,13 +32,18 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        $request->merge([
+            'phone' => $this->formatPhone($request->phone),
+        ]);
+
         $request->validate([
             'name' => 'required',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
             'phone' => [
                 'required',
-                'regex:/^(08|628|\+628)\d{8,13}$/'
+                'regex:/^(08|628|\+628)\d{8,13}$/',
+                'unique:users,phone',
             ],
         ]);
 
@@ -119,7 +124,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Login berhasil',
             'token' => $token,
-            'user' => $user
+            'user' => new \App\Http\Resources\UserResource($user)
         ]);
     }
 

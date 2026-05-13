@@ -31,4 +31,8 @@ return [
         ],
     ],
 
+    'whatsapp' => [
+        'token' => env('TOKEN_FONTE'),
+    ],
+
 ];

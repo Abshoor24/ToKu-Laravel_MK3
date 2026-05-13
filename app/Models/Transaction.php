@@ -9,7 +9,13 @@ class Transaction extends Model
 {   
     protected $fillable = [
         'user_id',
-        'total_price'
+        'name',
+        'phone',
+        'total_price',
+    ];
+
+    protected $casts = [
+        'total_price' => 'integer',
     ];
     
     public function items()
