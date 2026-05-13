@@ -1,3 +1,4 @@
+```php
 <?php
 
 namespace App\Http\Controllers;
@@ -20,7 +21,8 @@ class TransactionController extends Controller
     {
         $this->waService = $waService;
     }
-    # GET
+
+    # GET ALL
     public function index()
     {
         $transactions = Transaction::with('items.product', 'user')
@@ -34,7 +36,7 @@ class TransactionController extends Controller
         ]);
     }
 
-    # READ BY ID
+    # GET BY ID
     public function show($id)
     {
         $transaction = Transaction::with('items.product', 'user')
@@ -61,89 +63,106 @@ class TransactionController extends Controller
         $user = Auth::user();
 
         $request->validate([
-            'items' => 'required|array|min:1',
+            'items'               => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity'   => 'required|integer|min:1',
         ]);
 
-        DB::beginTransaction();
-
         try {
-            $productIds = collect($request->items)->pluck('product_id')->unique();
 
-            $products = Product::whereIn('id', $productIds)
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
+            $transaction = DB::transaction(function () use ($request, $user) {
 
-            $itemsByProduct = collect($request->items)
-                ->groupBy('product_id')
-                ->map(fn ($items) => $items->sum('quantity'));
+                $total = 0;
+                $itemsData = [];
 
-            $total = 0;
+                foreach ($request->items as $item) {
 
-            foreach ($itemsByProduct as $productId => $quantity) {
-                $product = $products->get($productId);
+                    // Lock product row biar aman dari race condition
+                    $product = Product::lockForUpdate()
+                        ->findOrFail($item['product_id']);
 
-                if (!$product) {
-                    throw new \Exception("Product ID {$productId} tidak ditemukan.");
+                    // Validasi stock
+                    if ($product->stock < $item['quantity']) {
+                        throw new \Exception(
+                            "Stock tidak cukup untuk produk {$product->name}"
+                        );
+                    }
+
+                    $subtotal = $product->price * $item['quantity'];
+
+                    $total += $subtotal;
+
+                    $itemsData[] = [
+                        'product' => $product,
+                        'quantity' => $item['quantity'],
+                        'price' => $product->price,
+                    ];
+
+                    // Kurangi stock
+                    $product->decrement('stock', $item['quantity']);
                 }
 
-                if ($product->stock < $quantity) {
-                    throw new \Exception("Stock not enough for {$product->name}");
-                }
-
-                $total += $product->price * $quantity;
-            }
-
-            $transaction = Transaction::create([
-                'user_id' => $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'total_price' => $total,
-            ]);
-
-            foreach ($request->items as $item) {
-                $product = $products->get($item['product_id']);
-
-                TransactionItem::create([
-                    'transaction_id' => $transaction->id,
-                    'product_id' => $product->id,
-                    'quantity' => $item['quantity'],
-                    'price' => $product->price,
+                // Create transaction
+                $transaction = Transaction::create([
+                    'user_id' => $user->id,
+                    'name' => $user->name,
+                    'phone' => $user->phone,
+                    'total_price' => $total,
                 ]);
 
-                $product->decrement('stock', $item['quantity']);
-            }
+                // Create transaction items
+                foreach ($itemsData as $data) {
 
-            DB::commit();
+                    TransactionItem::create([
+                        'transaction_id' => $transaction->id,
+                        'product_id' => $data['product']->id,
+                        'quantity' => $data['quantity'],
+                        'price' => $data['price'],
+                    ]);
+                }
+
+                return $transaction;
+            });
 
             $transaction->load('items.product', 'user');
 
+            // Generate receipt
             $message = $this->generateReceipt($transaction);
 
+            // Send WhatsApp receipt
             try {
-                $this->waService->send($transaction->phone, $message);
+
+                $this->waService->send(
+                    $transaction->phone,
+                    $message
+                );
+
             } catch (\Throwable $e) {
-                Log::warning('Failed to send WhatsApp receipt for transaction '.$transaction->id.': '.$e->getMessage());
+
+                Log::warning(
+                    'Failed send WA receipt transaction ID '
+                    . $transaction->id .
+                    ': ' .
+                    $e->getMessage()
+                );
             }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Transaksi berhasil',
                 'data' => new TransactionResource($transaction)
-            ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
+            ], 201);
+
+        } catch (\Exception $e) {
 
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
-            ], 500);
+            ], 400);
         }
     }
 
-    #delete
+    # DELETE
     public function delete($id)
     {
         $transaction = Transaction::where('id', $id)
@@ -165,22 +184,35 @@ class TransactionController extends Controller
         ]);
     }
 
-    public function generateReceipt($transaction)
+    # GENERATE RECEIPT
+    public function generateReceipt($transaction): string
     {
-        $message = "🧾 *STRUK PEMBELIAN*\n\n";
-        $message .= "Nama: {$transaction->name}\n";
-        $message .= "No HP: {$transaction->phone}\n";
-        $message .= "Tanggal: {$transaction->created_at}\n\n";
+        $message  = "🧾 *STRUK PEMBELIAN*\n\n";
+        $message .= "Nama   : {$transaction->name}\n";
+        $message .= "No HP  : {$transaction->phone}\n";
+        $message .= "Tanggal: {$transaction->created_at->format('d/m/Y H:i')}\n\n";
 
         $message .= "📦 *Detail Produk:*\n";
 
         foreach ($transaction->items as $item) {
-            $message .= "- {$item->product->name} x{$item->quantity} = Rp" . number_format($item->price * $item->quantity) . "\n";
+
+            $subtotal = number_format(
+                $item->price * $item->quantity,
+                0,
+                ',',
+                '.'
+            );
+
+            $message .= "- {$item->product->name} x{$item->quantity} = Rp{$subtotal}\n";
         }
 
-        $message .= "\n💰 *Total: Rp" . number_format($transaction->total_price) . "*\n";
-        $message .= "\nTerima kasih 🙏";
+        $message .= "\n💰 *Total: Rp" .
+            number_format($transaction->total_price, 0, ',', '.') .
+            "*\n";
+
+        $message .= "\nTerima kasih telah berbelanja 🙏";
 
         return $message;
     }
 }
+```

@@ -17,7 +17,7 @@ class ProductResource extends JsonResource
             'stock' => $this->stock,
             'description' => $this->description,
             'image' => $this->image ? asset('storage/' . $this->image) : null, # mengubahnama file yang tersimpan di database menjadi URL lengkap yang bisa diakses browser/frontend.
-            'created_at' => $this->created_at
+            'created_at' => $this->created_at?->toIso8601String()
         ];
     }
 }
