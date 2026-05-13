@@ -16,8 +16,7 @@ class TransactionResource extends JsonResource
             'phone' => $this->phone,
             'total_price' => $this->total_price,
             'created_at' => $this->created_at,
-
-            'items' => $this->items->map(function ($item) {
+            'items' => $this->whenLoaded('items', fn() => $this->items->map(function ($item) {
                 return [
                     'product' => [
                         'id' => $item->product->id,
@@ -28,7 +27,7 @@ class TransactionResource extends JsonResource
                     'price' => $item->price,
                     'subtotal' => $item->price * $item->quantity,
                 ];
-            }),
+            })),
         ];
     }
 }
