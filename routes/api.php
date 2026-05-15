@@ -6,6 +6,11 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Resources\UserResource;
 use App\Http\Controllers\ProductController;
+use App\Http\Resources\ProductResource;
+use App\Http\Resources\TransactionResource;
+use App\Models\Product;
+use App\Models\User;
+use App\Models\Transaction;
 
 // Public
 Route::middleware('throttle:10,1')->group(function () {
@@ -31,4 +36,44 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', function (Request $request) {
         return new UserResource($request->user());
     });
+});
+
+// CEK RESPONSE 
+Route::get('/debug-all', function () {
+
+    return response()->json([
+
+        // Collection
+        'products' => ProductResource::collection(Product::all()),
+
+        'transactions' => TransactionResource::collection(Transaction::all()),
+
+        // Single item
+        'product_detail' => new ProductResource(Product::first()),
+
+        'transaction_detail' => new TransactionResource(Transaction::first()),
+
+        // User
+        'user' => new UserResource(User::first()),
+
+        // Simulasi login response
+        'login_response' => [
+            'message' => 'Login success',
+            'token' => 'example_token_123',
+            'user' => new UserResource(User::first()),
+        ],
+
+        // Simulasi register response
+        'register_response' => [
+            'message' => 'Register success',
+            'user' => new UserResource(User::first()),
+        ],
+
+        // Simulasi logout
+        'logout_response' => [
+            'message' => 'Logout success'
+        ],
+
+    ]);
+
 });

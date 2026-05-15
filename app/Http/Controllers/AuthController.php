@@ -5,24 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-// use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use App\Mail\OtpMail;
 use Illuminate\Support\Facades\Hash;
+use App\Traits\ApiResponseTrait;
 
 class AuthController extends Controller
 {
+    use ApiResponseTrait;
 
     public function formatPhone($phone)
     {
         $phone = preg_replace('/[^0-9]/', '', $phone);
 
-        // kalau diawali 0 → ganti ke 62
         if (substr($phone, 0, 1) == '0') {
             $phone = '62' . substr($phone, 1);
         }
 
-        // kalau sudah 62 → biarkan
         if (substr($phone, 0, 2) == '62') {
             return $phone;
         }
@@ -37,10 +36,10 @@ class AuthController extends Controller
         ]);
 
         $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
+            'name'     => 'required',
+            'email'    => 'required|email|unique:users',
             'password' => 'required|min:6',
-            'phone' => [
+            'phone'    => [
                 'required',
                 'regex:/^(08|628|\+628)\d{8,13}$/',
                 'unique:users,phone',
@@ -50,90 +49,93 @@ class AuthController extends Controller
         $otp = rand(100000, 999999);
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'phone' => $this->formatPhone($request->phone),
-            'role' => 'user',
-            'otp' => $otp,
+            'name'           => $request->name,
+            'email'          => $request->email,
+            'password'       => Hash::make($request->password),
+            'phone'          => $this->formatPhone($request->phone),
+            'role'           => 'user',
+            'otp'            => $otp,
             'otp_expires_at' => now()->addMinutes(5),
         ]);
 
         Mail::to($user->email)->send(new OtpMail($otp));
 
-        return response()->json([
-            'message' => 'Register berhasil, cek email untuk OTP'
-        ]);
+        return $this->successResponse(
+            null,
+            'Register berhasil, cek email untuk OTP',
+            201
+        );
     }
 
     public function verifyOtp(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
-            'otp' => 'required'
+            'otp'   => 'required'
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (!$user) {
-            return response()->json(['message' => 'User tidak ditemukan'], 404);
+            return $this->errorResponse('User tidak ditemukan', 404);
         }
 
         if (!$user->otp || !$user->otp_expires_at) {
-            return response()->json(['message' => 'OTP tidak valid / belum dibuat'], 400);
+            return $this->errorResponse('OTP tidak valid / belum dibuat', 400);
         }
 
         if ((string)$user->otp !== (string)$request->otp) {
-            return response()->json(['message' => 'OTP salah'], 400);
+            return $this->errorResponse('OTP salah', 400);
         }
 
         if (now()->gt($user->otp_expires_at)) {
-            return response()->json(['message' => 'OTP expires'], 400);
+            return $this->errorResponse('OTP expired', 400);
         }
 
         $user->update([
             'email_verified_at' => now(),
-            'otp' => null,
-            'otp_expires_at' => null
+            'otp'               => null,
+            'otp_expires_at'    => null,
         ]);
 
-        return response()->json([
-            'message' => 'Email berhasil diverifikasi'
-        ]);
+        return $this->successResponse(
+            null,
+            'Email berhasil diverifikasi'
+        );
     }
 
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required'
         ]);
 
         if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json(['message' => 'Email atau password salah'], 401);
+            return $this->errorResponse('Email atau password salah', 401);
         }
 
         $user = Auth::user();
 
         if (!$user->email_verified_at) {
-            return response()->json(['message' => 'Verifikasi email dulu'], 403);
+            return $this->errorResponse('Verifikasi email dulu', 403);
         }
 
         $token = $user->createToken('token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login berhasil',
-            'token' => $token,
-            'user' => new \App\Http\Resources\UserResource($user)
-        ]);
+        return $this->successResponse(
+            [
+                'token' => $token,
+                'user'  => new \App\Http\Resources\UserResource($user),
+            ],
+            'Login berhasil'
+        );
     }
 
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'message' => 'Logout berhasil'
-        ]);
+        return $this->successResponse(null, 'Logout berhasil');
     }
 }
