@@ -14,11 +14,13 @@ class ProductForm
             ->components([
                 TextInput::make('name')
                     ->required(),
+                TextInput::make('brand')
+                    ->nullable(),
                 TextInput::make('description'),
                 TextInput::make('price')
                     ->required()
                     ->numeric()
-                    ->prefix('$'),
+                    ->prefix('Rp'),
                 TextInput::make('category')
                     ->required(),
                 TextInput::make('stock')

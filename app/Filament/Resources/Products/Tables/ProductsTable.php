@@ -18,6 +18,8 @@ class ProductsTable
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('brand')
+                    ->searchable(),
                 TextColumn::make('description')
                     ->searchable(),
                 TextColumn::make('price')
