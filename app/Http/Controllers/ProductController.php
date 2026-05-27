@@ -33,4 +33,26 @@ class ProductController extends Controller
             'Product detail fetched'
         );
     }
+
+    public function categories()
+    {
+        $categories =  Product::select('category')
+        ->distinct()
+        ->whereNotNull('category')
+        ->pluck('category');
+
+        return $this->successResponse($categories, 'Categories fetched');
+    }
+
+    public function brand()
+    {
+        $brand = Product::select('brand')
+        ->distinct()
+        ->whereNotNull('brand')
+        ->pluck('brand');
+
+        
+        return $this->successResponse($brand, 'Brands fetched');
+    }
+
 }
