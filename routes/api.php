@@ -13,7 +13,8 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::post('/register',   [AuthController::class, 'register']);
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
     Route::post('/login',      [AuthController::class, 'login']);
-
+    Route::post('/resend-otp', [AuthController::class, 'resendOtp']);
+    
     Route::get('/products',       [ProductController::class, 'index']);
     Route::get('/products/{id}',  [ProductController::class, 'show']);
     Route::get('/categories',     [ProductController::class, 'categories']);
