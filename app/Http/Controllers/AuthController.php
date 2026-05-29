@@ -132,6 +132,44 @@ class AuthController extends Controller
         );
     }
 
+    public function resendOtp(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email'
+    ]);
+
+    $user = User::where('email', $request->email)->first();
+
+    if (!$user) {
+        return $this->errorResponse('User tidak ditemukan', 404);
+    }
+
+    if ($user->email_verified_at) {
+        return $this->errorResponse('Email sudah terverifikasi', 400);
+    }
+
+    // Cek apakah OTP lama masih aktif (belum expired)
+    if ($user->otp_expires_at && now()->lt($user->otp_expires_at)) {
+        $sisaDetik = now()->diffInSeconds($user->otp_expires_at);
+        return $this->errorResponse(
+            "OTP masih aktif, tunggu {$sisaDetik} detik lagi",
+            400
+        );
+    }
+
+    // Generate OTP baru
+    $otp = rand(100000, 999999);
+
+    $user->update([
+        'otp'            => $otp,
+        'otp_expires_at' => now()->addMinutes(5),
+    ]);
+
+    Mail::to($user->email)->send(new OtpMail($otp));
+
+    return $this->successResponse(null, 'OTP baru telah dikirim ke email');
+}
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
