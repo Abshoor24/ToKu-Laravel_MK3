@@ -21,7 +21,7 @@ class ProductInfolist
                 TextEntry::make('stock')
                     ->numeric(),
                 ImageEntry::make('image')
-                    ->placeholder('-'),
+                ->getStateUsing(fn ($record) => asset('storage/' . $record->image)),
                 TextEntry::make('created_at')
                     ->dateTime()
                     ->placeholder('-'),

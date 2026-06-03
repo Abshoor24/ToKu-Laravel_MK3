@@ -28,7 +28,9 @@ class ProductForm
                     ->numeric()
                     ->default(0),
                 FileUpload::make('image')
-                    ->image(),
+                    ->image()
+                    ->disk('public')
+                    ->directory('products')
             ]);
     }
 }
